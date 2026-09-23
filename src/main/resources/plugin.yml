@@ -1,0 +1,19 @@
+name: Assassins
+version: '${version}'
+main: dev.tigermce.assassins.AssassinsPlugin
+api-version: '26.2'
+description: GUI-configured, server-wide assassins events
+author: Sylvye
+commands:
+  assassins:
+    description: Open the Assassins event GUI
+    usage: /assassins [rewards|settings]
+    aliases: [assassin, assn]
+    permission: assassins.use
+permissions:
+  assassins.use:
+    description: View Assassins event progress
+    default: true
+  assassins.admin:
+    description: Configure and control Assassins events
+    default: op
