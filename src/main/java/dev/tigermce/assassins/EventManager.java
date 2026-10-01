@@ -107,7 +107,7 @@ public final class EventManager {
                     .append(Items.text("[Open Assassins]", NamedTextColor.AQUA).clickEvent(ClickEvent.runCommand("/assassins"))));
             player.playSound(player.getLocation(), rewarded ? Sound.ENTITY_PLAYER_LEVELUP : Sound.BLOCK_NOTE_BLOCK_BASS, 0.9f, 1.1f);
         }
-        if (p.round >= state.rounds) finish(hunter); else if (player != null) announceTarget(player);
+        if (p.round >= state.rounds) finish(hunter); else if (player != null) { announceTarget(player); updateTracker(player); }
     }
 
     private void finish(UUID id) {
@@ -126,9 +126,8 @@ public final class EventManager {
     }
 
     public void join(Player player) {
-        removeTrackers(player);
-        if (!state.active || !state.participant(player.getUniqueId())) return;
-        PlayerProgress p = state.progress(player.getUniqueId()); if (p == null || p.finished) return;
+        if (!state.active || !state.participant(player.getUniqueId())) { removeTrackers(player); return; }
+        PlayerProgress p = state.progress(player.getUniqueId()); if (p == null || p.finished) { removeTrackers(player); return; }
         announceTarget(player); updateTracker(player);
     }
 
@@ -152,29 +151,39 @@ public final class EventManager {
                 .append(Items.text(name + " ", NamedTextColor.RED)).append(Items.text("[View]", NamedTextColor.GREEN).clickEvent(ClickEvent.runCommand("/assassins"))));
     }
 
-    private void updateTracker(Player player) {
-        UUID targetId = state.target(player.getUniqueId()); if (targetId == null) { removeTrackers(player); return; }
-        Player target = Bukkit.getPlayer(targetId); ItemStack tracker = findTracker(player);
-        if (tracker == null) {
-            if (player.getInventory().firstEmpty() < 0) return;
-            tracker = new ItemStack(Material.COMPASS); player.getInventory().addItem(tracker);
+    void updateTracker(Player player) {
+        UUID targetId = state.target(player.getUniqueId());
+        if (!state.active || targetId == null) { removeTrackers(player); return; }
+        if (player.isDead()) return;
+        PlayerInventory inventory = player.getInventory();
+        int slot = -1;
+        for (int i = 0; i < inventory.getSize(); i++) {
+            if (!isTracker(inventory.getItem(i))) continue;
+            if (slot < 0) slot = i; else inventory.setItem(i, null);
         }
+        if (slot < 0) slot = inventory.firstEmpty();
+        if (slot < 0) return;
+        ItemStack tracker = inventory.getItem(slot);
+        if (tracker == null) tracker = new ItemStack(Material.COMPASS);
+        tracker.setAmount(1);
+        Player target = Bukkit.getPlayer(targetId);
         CompassMeta meta = (CompassMeta) tracker.getItemMeta();
         meta.getPersistentDataContainer().set(compassKey, PersistentDataType.BYTE, (byte) 1);
         String targetName = Optional.ofNullable(Bukkit.getOfflinePlayer(targetId).getName()).orElse("Unknown");
-        meta.displayName(Items.text("Assassin Tracker: " + targetName, NamedTextColor.RED));
+        meta.displayName(Items.text("Target › ", NamedTextColor.GRAY).append(Items.text(targetName, NamedTextColor.AQUA)));
+        meta.setEnchantmentGlintOverride(true);
         meta.lore(List.of(Items.text(target != null && target.isOnline() ? "Tracking current location" : "Target is offline", target != null && target.isOnline() ? NamedTextColor.AQUA : NamedTextColor.GRAY), Items.text("Round " + (state.progress(player.getUniqueId()).round + 1) + "/" + state.rounds, NamedTextColor.YELLOW)));
         if (target != null && target.isOnline()) { meta.setLodestone(target.getLocation()); meta.setLodestoneTracked(false); }
         else meta.setLodestone(null);
         tracker.setItemMeta(meta);
+        inventory.setItem(slot, tracker);
     }
 
-    private ItemStack findTracker(Player player) {
-        for (ItemStack stack : player.getInventory().getContents()) if (isTracker(stack)) return stack;
-        return null;
-    }
     public boolean isTracker(ItemStack stack) { return stack != null && stack.getType() == Material.COMPASS && stack.hasItemMeta() && stack.getItemMeta().getPersistentDataContainer().has(compassKey, PersistentDataType.BYTE); }
-    public void removeTrackers(Player player) { for (ItemStack stack : player.getInventory().getContents()) if (isTracker(stack)) stack.setAmount(0); }
+    public void removeTrackers(Player player) {
+        PlayerInventory inventory = player.getInventory();
+        for (int i = 0; i < inventory.getSize(); i++) if (isTracker(inventory.getItem(i))) inventory.setItem(i, null);
+    }
     public void removeAllTrackers() {
         Bukkit.getOnlinePlayers().forEach(this::removeTrackers);
         for (World world : Bukkit.getWorlds()) for (Item item : world.getEntitiesByClass(Item.class)) if (isTracker(item.getItemStack())) item.remove();

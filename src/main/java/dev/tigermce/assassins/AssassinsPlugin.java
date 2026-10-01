@@ -21,6 +21,7 @@ public final class AssassinsPlugin extends JavaPlugin implements Listener, Comma
         Persistence persistence = new Persistence(getDataFolder());
         events = new EventManager(this, persistence, persistence.load()); menus = new MenuManager(this, events);
         Bukkit.getPluginManager().registerEvents(this, this); Bukkit.getPluginManager().registerEvents(menus, this);
+        Bukkit.getPluginManager().registerEvents(new TrackerListener(this, events), this);
         PluginCommand command = getCommand("assassins"); if (command != null) { command.setExecutor(this); command.setTabCompleter(this); }
         Bukkit.getScheduler().runTaskTimer(this, events::tick, 20L, 20L);
         if (events.state.active) getLogger().info("Resumed an active Assassins event with " + events.state.participants.size() + " participants.");
